@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
+import path from 'path';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
 import { nanoid } from 'nanoid';
@@ -10,7 +11,7 @@ const PORT = Number(process.env.PORT ?? 3001);
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
 
 const httpLogger = pinoHttp({
-  logger,
+  logger: logger as any,
   genReqId: (req) => (req.headers['x-request-id'] as string) || nanoid(),
   serializers: {
     req(req) {
@@ -142,8 +143,17 @@ app.post('/debug/sql', async (req: Request, res: Response) => {
   }
 });
 
+// Serve static files from web/dist (built frontend)
+const webDistPath = path.join(__dirname, '..', 'web', 'dist');
+app.use(express.static(webDistPath));
+
 // API routes
 app.use('/api', chatRouter);
+
+// Catch-all handler: serve index.html for client-side routing
+app.get('*', (_req: Request, res: Response) => {
+  res.sendFile(path.join(webDistPath, 'index.html'));
+});
 
 // Error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
