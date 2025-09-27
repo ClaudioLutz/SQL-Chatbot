@@ -5,8 +5,27 @@ let knexInstance: Knex | null = null;
 
 function createConfig(): Knex.Config {
   const client = env.KNEX_CLIENT; // 'sqlite3' | 'pg'
+  const baseConfig = {
+    debug: true, // Enable SQL query logging
+    log: {
+      warn: (message: any) => console.warn('Knex Warning:', message),
+      error: (message: any) => console.error('Knex Error:', message),
+      debug: (message: any) => {
+        if (message.sql) {
+          console.log('SQL:', message.sql);
+          if (message.bindings && message.bindings.length > 0) {
+            console.log('Params:', message.bindings);
+          }
+        } else {
+          console.log('Knex Debug:', message);
+        }
+      },
+    },
+  };
+
   if (client === 'sqlite3') {
     return {
+      ...baseConfig,
       client: 'sqlite3',
       connection: {
         filename: './db.sqlite',
@@ -19,6 +38,7 @@ function createConfig(): Knex.Config {
     throw new Error('DATABASE_URL is required when KNEX_CLIENT=pg');
   }
   return {
+    ...baseConfig,
     client: 'pg',
     connection: env.DATABASE_URL,
     pool: { min: 0, max: 5 },
@@ -42,11 +62,10 @@ export async function runQuery<T = any>(sql: string, bindings: readonly any[] = 
     return { rows, count: rows.length };
   }
   // sqlite:
-  // knex for sqlite3 returns { rows: [...] } via better-sqlite3 dialect or array in result
+  // knex for sqlite3 returns the rows array directly
   const result = await db.raw(sql, bindings);
-  const rows = (result as any)?.[0] ?? (result as any).rows ?? result ?? [];
-  const normalized = Array.isArray(rows) ? rows : [];
-  return { rows: normalized, count: normalized.length };
+  const rows = Array.isArray(result) ? result : [];
+  return { rows, count: rows.length };
 }
 
 // Close DB (for tests)

@@ -107,6 +107,7 @@ router.post('/chat', async (req: Request, res: Response, next: NextFunction) => 
     return res.status(200).json({
       answer: tr.answer_short,
       sql: tr.sql,
+      parameters: tr.parameters ?? [],
       rowsCount: count,
       elapsedMs,
       rows: Array.isArray(rows) ? rows.slice(0, 20) : [],

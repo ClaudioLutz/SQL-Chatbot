@@ -1,4 +1,5 @@
 import { requireOpenAI } from '../config/env';
+import { parseTimeExpression } from '../utils/time-bounds';
 
 export type TranslationResult = {
   sql: string;
@@ -39,7 +40,46 @@ export async function translateQuestion(args: TranslateArgs): Promise<Translatio
       };
     }
 
-    // Default mock: top 5 cities by revenue
+    // Handle "last quarter" queries
+    if (q.includes('last quarter')) {
+      const timeBounds = parseTimeExpression(q);
+      if (timeBounds) {
+        // Check if asking for cities by revenue
+        if (q.includes('cities') && q.includes('revenue')) {
+          return {
+            sql: [
+              'WITH revenue_by_city AS (',
+              '  SELECT c.city AS city, SUM(o.total) AS revenue',
+              '  FROM orders o',
+              '  JOIN customers c ON c.id = o.customer_id',
+              '  WHERE o.order_date >= ? AND o.order_date <= ?',
+              '  GROUP BY c.city',
+              ')',
+              'SELECT city, revenue',
+              'FROM revenue_by_city',
+              'ORDER BY revenue DESC',
+              'LIMIT 5',
+            ].join(' '),
+            parameters: [timeBounds.start, timeBounds.end],
+            answer_short: `Returns the top 5 cities by total order revenue for ${timeBounds.period}.`,
+          };
+        }
+        
+        // Default last quarter query: order count
+        return {
+          sql: [
+            'SELECT COUNT(*) AS order_count',
+            'FROM orders o',
+            'WHERE o.order_date >= ? AND o.order_date <= ?',
+            'LIMIT 100',
+          ].join(' '),
+          parameters: [timeBounds.start, timeBounds.end],
+          answer_short: `Returns order count for ${timeBounds.period}.`,
+        };
+      }
+    }
+
+    // Default mock: top 5 cities by revenue (no time filter)
     return {
       sql: [
         'WITH revenue_by_city AS (',

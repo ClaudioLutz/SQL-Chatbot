@@ -42,4 +42,45 @@ describe('POST /api/chat (e2e)', () => {
 
     expect(res.body).toHaveProperty('error');
   });
+
+  it('handles "last quarter" time queries and returns results', async () => {
+    const res = await request(app)
+      .post('/api/chat')
+      .send({ question: 'Top 5 cities by total order revenue last quarter' })
+      .expect(200);
+
+    // Basic shape validation
+    expect(res.body).toBeTruthy();
+    expect(typeof res.body.answer).toBe('string');
+    expect(typeof res.body.sql).toBe('string');
+    expect(typeof res.body.rowsCount).toBe('number');
+    expect(typeof res.body.elapsedMs).toBe('number');
+
+    // Should be SELECT-only SQL
+    expect(res.body.sql.toUpperCase()).toContain('SELECT');
+    
+    // Should contain time filtering with parameters
+    expect(res.body.sql).toContain('o.order_date >= ?');
+    expect(res.body.sql).toContain('o.order_date <= ?');
+    
+    // Should have parameters for time bounds
+    expect(Array.isArray(res.body.parameters)).toBe(true);
+    expect(res.body.parameters.length).toBe(2);
+    
+    // Parameters should be date strings (YYYY-MM-DD format)
+    expect(res.body.parameters[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(res.body.parameters[1]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // Should have proper response structure (rows might be 0 if no cities have data)
+    expect(typeof res.body.rowsCount).toBe('number');
+    expect(Array.isArray(res.body.rows)).toBe(true);
+    
+    // If we have rows, validate their structure
+    if (res.body.rows.length > 0) {
+      const row0 = res.body.rows[0];
+      expect(row0).toHaveProperty('city');
+      expect(row0).toHaveProperty('revenue');
+      expect(typeof row0.revenue).toBe('number');
+    }
+  });
 });

@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "migrate": "knex --knexfile knexfile.cjs migrate:latest",
     "seed": "knex --knexfile knexfile.cjs seed:run",
+    "reseed": "knex --knexfile knexfile.cjs migrate:rollback && knex --knexfile knexfile.cjs migrate:latest && knex --knexfile knexfile.cjs seed:run",
     "test": "vitest --run"
   },
   "dependencies": {
